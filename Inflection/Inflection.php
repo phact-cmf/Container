@@ -27,4 +27,9 @@ class Inflection implements InflectionInterface
     {
         return $this->class;
     }
+
+    public function canBeAppliedTo(object $object): bool
+    {
+        return is_a($object, $this->class);
+    }
 }

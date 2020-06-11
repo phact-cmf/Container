@@ -9,4 +9,6 @@ interface InflectionInterface
     public function getProperties(): array;
 
     public function getCalls(): array;
+
+    public function canBeAppliedTo(object $object): bool;
 }

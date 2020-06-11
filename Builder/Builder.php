@@ -8,6 +8,7 @@ use Phact\Container\Details\CallInterface;
 use Phact\Container\Details\PropertyInterface;
 use Phact\Container\Exceptions\InvalidFactoryException;
 use Phact\Container\Exceptions\NotFoundException;
+use Phact\Container\Inflection\InflectionInterface;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 use ReflectionException;
@@ -16,7 +17,7 @@ use ReflectionFunctionAbstract;
 use ReflectionMethod;
 use ReflectionParameter;
 
-class Builder
+class Builder implements BuilderInterface
 {
     protected const DEPENDENCY_VALUE = 1;
     protected const DEPENDENCY_OBJECT_VALUE_REQUIRED = 2;
@@ -43,19 +44,28 @@ class Builder
 
     protected $autoWire = true;
 
-    public function __construct(ContainerInterface $container, bool $autoWire = true)
+    public function __construct(bool $autoWire = true)
     {
-        $this->container = $container;
         $this->autoWire = true;
     }
 
-    public function build(DefinitionInterface $definition): object
+    public function setContainer(ContainerInterface $container): void
+    {
+        $this->container = $container;
+    }
+
+    public function construct(DefinitionInterface $definition): object
     {
         if ($definition->getFactory()) {
             $object = $this->makeObjectWithFactory($definition);
         } else {
             $object = $this->makeObjectSelf($definition);
         }
+        return $object;
+    }
+
+    public function configure(object $object, DefinitionInterface $definition): object
+    {
         $this->applyProperties($object, $definition->getProperties());
         $this->applyCalls($object, $definition->getCalls());
         return $object;
@@ -64,6 +74,12 @@ class Builder
     public function invoke(callable $callable, array $arguments = [])
     {
         return $this->call($callable, $arguments);
+    }
+
+    public function inflect(object $object, InflectionInterface $inflection): void
+    {
+        $this->applyCalls($object, $inflection->getCalls());
+        $this->applyProperties($object, $inflection->getProperties());
     }
 
     /**
