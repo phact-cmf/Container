@@ -1,0 +1,43 @@
+{
+  "name": "phact-cmf/container",
+  "description": "PSR-11 compatible dependency injection container",
+  "keywords": ["psr11", "container", "dependency", "injection", "di"],
+  "homepage": "https://github.com/phact-cmf/Container",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Anton Okulov",
+      "email": "qantus@mail.ru",
+      "homepage": "https://github.com/AntonOkulov",
+      "role": "Developer"
+    },
+    {
+      "name": "Maxim Korobitsyn",
+      "email": "dog.mixer@gmain.com",
+      "homepage": "https://github.com/tsukasa-mixer",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "php": ">=7.2",
+    "psr/container": "^1.0"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-master",
+    "phpunit/phpunit": "^8",
+    "squizlabs/php_codesniffer": "^3.5"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  },
+  "autoload": {
+    "psr-4": {
+      "Phact\\Container\\": "",
+      "Tests\\": "Tests"
+    },
+    "exclude-from-classmap": [
+      "/Tests/"
+    ]
+  }
+}
