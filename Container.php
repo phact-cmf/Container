@@ -2,7 +2,7 @@
 
 namespace Phact\Container;
 
-use Closure;
+use Phact\Container\Builder\Builder;
 use Phact\Container\Builder\BuilderInterface;
 use Phact\Container\Definition\Definition;
 use Phact\Container\Definition\DefinitionInterface;
@@ -11,11 +11,6 @@ use Phact\Container\Exceptions\DuplicateNameException;
 use Phact\Container\Exceptions\NotFoundException;
 use Phact\Container\Inflection\InflectionInterface;
 use Psr\Container\ContainerInterface;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionFunction;
-use ReflectionFunctionAbstract;
-use ReflectionMethod;
 
 class Container implements ContainerInterface
 {
@@ -66,13 +61,17 @@ class Container implements ContainerInterface
      * @var bool
      */
     protected $analyzeReferences = true;
+
     /**
      * @var BuilderInterface
      */
-    private $builder;
+    protected $builder;
 
-    public function __construct(BuilderInterface $builder)
+    public function __construct(?BuilderInterface $builder = null)
     {
+        if (!$builder) {
+            $builder = new Builder();
+        }
         $this->builder = $builder;
         $this->builder->setContainer($this);
     }
