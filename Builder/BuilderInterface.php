@@ -14,7 +14,7 @@ interface BuilderInterface
 
     public function invoke(callable $callable, array $arguments = []);
 
-    public function inflect(object $object, InflectionInterface $inflection): void;
+    public function inflect(object $object, InflectionInterface $inflection): object;
 
     public function setContainer(ContainerInterface $container): void;
 }

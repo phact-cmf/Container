@@ -76,10 +76,11 @@ class Builder implements BuilderInterface
         return $this->call($callable, $arguments);
     }
 
-    public function inflect(object $object, InflectionInterface $inflection): void
+    public function inflect(object $object, InflectionInterface $inflection): object
     {
         $this->applyCalls($object, $inflection->getCalls());
         $this->applyProperties($object, $inflection->getProperties());
+        return $object;
     }
 
     /**

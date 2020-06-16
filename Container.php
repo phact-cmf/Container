@@ -144,7 +144,7 @@ class Container implements ContainerInterface
     protected function resolveDefinitionById(string $id): object
     {
         if (!isset($this->definitions[$id])) {
-            if ($this->aliases[$id]) {
+            if (isset($this->aliases[$id])) {
                 $id = reset($this->aliases[$id]);
             }
             if ($this->analyzeReferences && isset($this->references[$id])) {
@@ -164,10 +164,14 @@ class Container implements ContainerInterface
         $object = $this->builder->configure($object, $definition);
         $this->inflect($object);
         $this->unsetLoading($id);
+        return $object;
     }
 
-    protected function setLoading(string $id): void
+    protected function setLoading(?string $id): void
     {
+        if ($id === null) {
+            return;
+        }
         if (isset($this->loading[$id])) {
             $loadingServices = implode(', ', array_keys($this->loading));
             throw new CircularException(sprintf("Circular dependency detected with services - %s", $loadingServices));
@@ -175,8 +179,11 @@ class Container implements ContainerInterface
         $this->loading[$id] = true;
     }
 
-    protected function unsetLoading(string $id): void
+    protected function unsetLoading(?string $id): void
     {
+        if ($id === null) {
+            return;
+        }
         unset($this->loading[$id]);
     }
 
@@ -216,7 +223,7 @@ class Container implements ContainerInterface
         }
 
         if ($this->autoWire && class_exists($id)) {
-            $this->resolveDefinition(
+            return $this->resolveDefinition(
                 (new Definition($id))->setShared(true)
             );
         }
