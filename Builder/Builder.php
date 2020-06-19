@@ -6,6 +6,7 @@ use Closure;
 use Phact\Container\Definition\DefinitionInterface;
 use Phact\Container\Details\CallInterface;
 use Phact\Container\Details\PropertyInterface;
+use Phact\Container\Exceptions\InvalidConfigurationException;
 use Phact\Container\Exceptions\InvalidFactoryException;
 use Phact\Container\Exceptions\NotFoundException;
 use Phact\Container\Inflection\InflectionInterface;
@@ -46,7 +47,7 @@ class Builder implements BuilderInterface
 
     public function __construct(bool $autoWire = true)
     {
-        $this->autoWire = true;
+        $this->autoWire = $autoWire;
     }
 
     public function setContainer(ContainerInterface $container): void
@@ -143,21 +144,17 @@ class Builder implements BuilderInterface
     {
         $factory = $definition->getFactory();
 
-        if (!is_callable($factory)) {
+        if (!is_callable($factory) || is_array($factory)) {
             $factory = $this->buildFactoryFromNonCallable($definition);
         }
 
-        if (is_callable($factory)) {
-            $dependencies = [];
-            if ($this->autoWire) {
-                $dependencies = $this->fetchCallableDependencies($factory);
-            }
-            $parameters = $this->buildParameters($definition->getArguments());
-            $arguments = $this->buildArguments($dependencies, $parameters);
-            return call_user_func_array($factory, $arguments);
+        $dependencies = [];
+        if ($this->autoWire) {
+            $dependencies = $this->fetchCallableDependencies($factory);
         }
-
-        throw new InvalidFactoryException('Incorrect factory provided');
+        $parameters = $this->buildParameters($definition->getArguments());
+        $arguments = $this->buildArguments($dependencies, $parameters);
+        return call_user_func_array($factory, $arguments);
     }
 
     protected function buildFactoryFromNonCallable(DefinitionInterface $definition): callable
@@ -166,13 +163,16 @@ class Builder implements BuilderInterface
         $factoryId = null;
         $factoryMethod = null;
         if (is_string($factory)) {
-            $factoryId = $this->fetchDependencyId($factory);
+            $factoryId = $this->fetchDependencyId($factory) ?: $factory;
             $factoryMethod = $definition->getConstructMethod() ?: '__invoke';
         } elseif (is_array($factory) && \count($factory) === 2) {
-            $factoryId = $this->fetchDependencyId($factory[0]);
+            $factoryId = $this->fetchDependencyId($factory[0]) ?: $factory[0];
             $factoryMethod = $factory[1];
         }
-        if ($factoryId && $factoryMethod) {
+        if (!$this->container) {
+            throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
+        }
+        if ($factoryId && $factoryMethod && $this->container->has($factoryId)) {
             $factoryResolved = $this->container->get($factoryId);
             return [$factoryResolved, $factoryMethod];
         }
@@ -242,7 +242,7 @@ class Builder implements BuilderInterface
             if ($constructor) {
                 $dependencies = $this->fetchFunctionDependencies($constructor);
             }
-            $this->constructors[$className] = $dependencies;
+            $this->constructors[$key] = $dependencies;
         }
         return $this->constructors[$key];
     }
@@ -359,7 +359,7 @@ class Builder implements BuilderInterface
             $arguments = $this->buildArgumentsFromDependencies($dependencies, $parameters);
         } else {
             foreach ($parameters as $parameter) {
-                $arguments[] = $this->makeArgument($parameter->getType(), $parameter->getType());
+                $arguments[] = $this->makeArgument($parameter->getType(), $parameter->getValue());
             }
         }
         return $arguments;
@@ -374,6 +374,8 @@ class Builder implements BuilderInterface
     protected function buildArgumentsFromDependencies(array $dependencies, array $parameters): array
     {
         $arguments = [];
+        $usedParameters = [];
+
         foreach ($dependencies as $key => $dependency) {
             $type = $dependency->getType();
             $value = $dependency->getValue();
@@ -381,8 +383,10 @@ class Builder implements BuilderInterface
             $parameter = null;
             if (isset($parameters[$key])) {
                 $parameter = $parameters[$key];
+                $usedParameters[] = $key;
             } elseif (isset($parameters[$dependency->getName()])) {
                 $parameter = $parameters[$dependency->getName()];
+                $usedParameters[] = $dependency->getName();
             }
 
             if ($parameter) {
@@ -392,6 +396,16 @@ class Builder implements BuilderInterface
 
             $arguments[] = $this->makeArgument($type, $value);
         }
+
+        foreach ($parameters as $key => $parameter) {
+            if (!in_array($key, $usedParameters, true)) {
+                $arguments[] = $this->makeArgument(
+                    $parameter->getType(),
+                    $parameter->getValue()
+                );
+            }
+        }
+
         return $arguments;
     }
 
@@ -399,15 +413,15 @@ class Builder implements BuilderInterface
      * @param $type
      * @param $value
      * @return mixed
-     * @throws NotFoundException
+     * @throws NotFoundException|InvalidConfigurationException
      */
     protected function makeArgument(int $type, $value)
     {
         switch ($type) {
-            case self::DEPENDENCY_VALUE:
-                return $value;
-
             case self::DEPENDENCY_REFERENCE_REQUIRED:
+                if (!$this->container) {
+                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
+                }
                 if ($this->container->has($value)) {
                     return $this->container->get($value);
                 }
@@ -415,19 +429,24 @@ class Builder implements BuilderInterface
 
             case self::DEPENDENCY_OBJECT_VALUE_OPTIONAL:
             case self::DEPENDENCY_REFERENCE_OPTIONAL:
+                if (!$this->container) {
+                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
+                }
                 if ($this->container->has($value)) {
                     return $this->container->get($value);
                 }
                 return null;
 
             case self::DEPENDENCY_OBJECT_VALUE_REQUIRED:
+                if (!$this->container) {
+                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
+                }
                 if ($this->container->has($value)) {
                     return $this->container->get($value);
                 }
                 throw new NotFoundException("There is no referenced classes of {$value} found");
-
             default:
-                return null;
+                return $value;
         }
     }
 }
