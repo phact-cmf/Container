@@ -396,6 +396,13 @@ class Builder implements BuilderInterface
             $arguments[] = $this->makeArgument($type, $value);
         }
 
+        $arguments = $this->appendUnusedParamsToArguments($parameters, $usedParameters, $arguments);
+
+        return $arguments;
+    }
+
+    protected function appendUnusedParamsToArguments(array $parameters, array $usedParameters, array $arguments): array
+    {
         foreach ($parameters as $key => $parameter) {
             if (!in_array($key, $usedParameters, true)) {
                 $arguments[] = $this->makeArgument(
@@ -404,7 +411,6 @@ class Builder implements BuilderInterface
                 );
             }
         }
-
         return $arguments;
     }
 
@@ -418,34 +424,34 @@ class Builder implements BuilderInterface
     {
         switch ($type) {
             case self::DEPENDENCY_REFERENCE_REQUIRED:
-                if (!$this->container) {
-                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
+            case self::DEPENDENCY_OBJECT_VALUE_REQUIRED:
+                $dependency = $this->retrieveDependencyFromContainer($value);
+                if ($dependency) {
+                    return $dependency;
                 }
-                if ($this->container->has($value)) {
-                    return $this->container->get($value);
-                }
-                throw new NotFoundException("There is no service with id {$value} found");
+                throw new NotFoundException("There is no referenced classes of {$value} found");
 
             case self::DEPENDENCY_OBJECT_VALUE_OPTIONAL:
             case self::DEPENDENCY_REFERENCE_OPTIONAL:
-                if (!$this->container) {
-                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
-                }
-                if ($this->container->has($value)) {
-                    return $this->container->get($value);
+                $dependency = $this->retrieveDependencyFromContainer($value);
+                if ($dependency) {
+                    return $dependency;
                 }
                 return null;
 
-            case self::DEPENDENCY_OBJECT_VALUE_REQUIRED:
-                if (!$this->container) {
-                    throw new InvalidConfigurationException('Please, provide container for usage dependencies');
-                }
-                if ($this->container->has($value)) {
-                    return $this->container->get($value);
-                }
-                throw new NotFoundException("There is no referenced classes of {$value} found");
             default:
                 return $value;
         }
+    }
+
+    protected function retrieveDependencyFromContainer($value)
+    {
+        if (!$this->container) {
+            throw new InvalidConfigurationException('Please, provide container for usage dependencies');
+        }
+        if ($this->container->has($value)) {
+            return $this->container->get($value);
+        }
+        return null;
     }
 }
