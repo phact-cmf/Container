@@ -15,11 +15,6 @@ class Dependency
     private $name;
 
     /**
-     * @var bool
-     */
-    private $optional;
-
-    /**
      * @var mixed
      */
     private $value;
@@ -27,12 +22,10 @@ class Dependency
     public function __construct(
         int $type,
         string $name,
-        bool $optional,
         $value = null
     ) {
         $this->type = $type;
         $this->name = $name;
-        $this->optional = $optional;
         $this->value = $value;
     }
 
@@ -50,14 +43,6 @@ class Dependency
     public function getName(): string
     {
         return $this->name;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isOptional(): bool
-    {
-        return $this->optional;
     }
 
     /**

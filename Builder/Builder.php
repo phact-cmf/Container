@@ -267,7 +267,6 @@ class Builder implements BuilderInterface
             $dependencies[] = new Dependency(
                 $type,
                 $param->getName(),
-                $param->isOptional(),
                 $value
             );
         }
