@@ -182,13 +182,13 @@ class Builder implements BuilderInterface
     protected function constructObject(string $className, array $arguments, ?string $constructMethod = null)
     {
         if ($constructMethod !== null) {
-            if ($arguments) {
+            if (count($arguments) > 0) {
                 $obj = $className::$constructMethod(...$arguments);
             } else {
                 $obj = $className::$constructMethod();
             }
         } else {
-            if ($arguments) {
+            if (count($arguments) > 0) {
                 $obj = new $className(...$arguments);
             } else {
                 $obj = new $className;
@@ -266,7 +266,7 @@ class Builder implements BuilderInterface
 
             $dependencies[] = new Dependency(
                 $type,
-                $param->getName(),
+                $param->name,
                 $value
             );
         }
@@ -287,7 +287,7 @@ class Builder implements BuilderInterface
             if ($parameter->allowsNull()) {
                 $type = self::DEPENDENCY_OBJECT_VALUE_OPTIONAL;
             }
-            $value = $c->getName();
+            $value = $c->name;
         } elseif ($parameter->isDefaultValueAvailable()) {
             $value = $parameter->getDefaultValue();
         }
@@ -354,7 +354,7 @@ class Builder implements BuilderInterface
     protected function buildArguments(array $dependencies, array $parameters): array
     {
         $arguments = [];
-        if ($dependencies) {
+        if (count($dependencies) > 0) {
             $arguments = $this->buildArgumentsFromDependencies($dependencies, $parameters);
         } else {
             foreach ($parameters as $parameter) {

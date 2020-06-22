@@ -203,7 +203,7 @@ class Container implements ContainerInterface
     {
         $this->setLoading($id);
         $object = $this->builder->construct($definition);
-        if ($id && $definition->isShared()) {
+        if ($id !== null && $definition->isShared()) {
             $this->shared[$id] = $object;
         }
         $object = $this->builder->configure($object, $definition);
