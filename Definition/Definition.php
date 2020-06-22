@@ -101,15 +101,6 @@ class Definition implements DefinitionInterface
     }
 
     /**
-     * @return self
-     */
-    public function removeAliases(): self
-    {
-        $this->aliases = [];
-        return $this;
-    }
-
-    /**
      * @return string|null
      */
     public function getConstructMethod(): ?string

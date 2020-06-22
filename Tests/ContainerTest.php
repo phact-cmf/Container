@@ -65,9 +65,11 @@ class ContainerTest extends TestCase
         $container = new Container();
         $definition = new Definition(ChildComponentWithSimpleInterface::class);
         $definition->addAlias('some_alias');
+        $definition->addAliases(['another_alias']);
         $container->addDefinition('referenced', $definition);
 
         $this->assertTrue($container->has('some_alias'));
+        $this->assertTrue($container->has('another_alias'));
     }
 
     public function testExceptionOnCircularDependency(): void
