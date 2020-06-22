@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Phact\Container\Exceptions\NotFoundException;
+use Psr\Container\ContainerInterface;
 use Tests\Mock\DependsSimpleComponent;
 use Phact\Container\Builder\BuilderInterface;
 use Phact\Container\Exceptions\CircularException;
@@ -259,6 +260,45 @@ class ContainerTest extends TestCase
         $container = new Container($builder);
 
         $container->invoke($callable, $arguments);
+    }
+
+    public function testHasProxyToDelegate(): void
+    {
+        $delegate = $this->createMock(ContainerInterface::class);
+        $delegate
+            ->expects($this->once())
+            ->method('has')
+            ->with('simple_component')
+            ->willReturn(true);
+
+        $container = new Container();
+        $container->addDelegate($delegate);
+
+        $this->assertTrue($container->has('simple_component'));
+    }
+
+    public function testGetProxyToDelegate(): void
+    {
+        $simple = new SimpleComponent();
+
+        $delegate = $this->createMock(ContainerInterface::class);
+        $delegate
+            ->expects($this->once())
+            ->method('has')
+            ->with('simple_component')
+            ->willReturn(true);
+
+        $delegate
+            ->expects($this->once())
+            ->method('get')
+            ->with('simple_component')
+            ->willReturn($simple);
+
+        $container = new Container();
+        $container->addDelegate($delegate);
+
+        $resolved = $container->get('simple_component');
+        $this->assertSame($simple, $resolved);
     }
 
     public function testHasByClassNotDefinedWithDisabledAutowireReturnFalse(): void
