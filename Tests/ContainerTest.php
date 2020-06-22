@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use Phact\Container\Definition\DefinitionAggregate;
 use Phact\Container\Exceptions\NotFoundException;
 use Psr\Container\ContainerInterface;
 use Tests\Mock\DependsSimpleComponent;
@@ -307,17 +308,6 @@ class ContainerTest extends TestCase
         $container->setAutoWire(false);
 
         $this->assertFalse($container->has(SimpleComponent::class));
-    }
-
-    public function testHasByReferencesWithDisabledAnalyzeReferencesReturnFalse(): void
-    {
-        $container = new Container();
-        $container->setAnalyzeReferences(false);
-
-        $definition = new Definition(ChildComponentWithSimpleInterface::class);
-        $container->addDefinition('referenced', $definition);
-
-        $this->assertFalse($container->has(SimpleInterface::class));
     }
 
     public function testExceptionOnGettingUnknownObject(): void

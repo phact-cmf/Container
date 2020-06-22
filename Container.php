@@ -5,6 +5,8 @@ namespace Phact\Container;
 use Phact\Container\Builder\Builder;
 use Phact\Container\Builder\BuilderInterface;
 use Phact\Container\Definition\Definition;
+use Phact\Container\Definition\DefinitionAggregate;
+use Phact\Container\Definition\DefinitionAggregateInterface;
 use Phact\Container\Definition\DefinitionInterface;
 use Phact\Container\Delegate\Delegate;
 use Phact\Container\Exceptions\CircularException;
@@ -16,24 +18,14 @@ use Psr\Container\ContainerInterface as PsrContainerInterface;
 class Container implements ContainerInterface
 {
     /**
+     * @var DefinitionAggregate
+     */
+    protected $definitionAggregate;
+
+    /**
      * @var array
      */
     protected $scalars = [];
-
-    /**
-     * @var Definition[]
-     */
-    protected $definitions = [];
-
-    /**
-     * @var array
-     */
-    protected $references = [];
-
-    /**
-     * @var array
-     */
-    protected $aliases = [];
 
     /**
      * Resolved shared instances
@@ -64,22 +56,24 @@ class Container implements ContainerInterface
     protected $autoWire = true;
 
     /**
-     * @var bool
-     */
-    protected $analyzeReferences = true;
-
-    /**
      * @var BuilderInterface
      */
     protected $builder;
 
-    public function __construct(?BuilderInterface $builder = null)
-    {
+    public function __construct(
+        ?BuilderInterface $builder = null,
+        ?DefinitionAggregateInterface $definitionAggregate = null
+    ) {
         if (!$builder) {
             $builder = new Builder();
         }
         $this->builder = $builder;
         $this->builder->setContainer($this);
+
+        if (!$definitionAggregate) {
+            $definitionAggregate = new DefinitionAggregate();
+        }
+        $this->definitionAggregate = $definitionAggregate;
     }
 
     /**
@@ -87,7 +81,7 @@ class Container implements ContainerInterface
      */
     public function addDefinitionClass(string $name, string $class): DefinitionInterface
     {
-        return $this->addDefinition($name, new Definition($class));
+        return $this->definitionAggregate->addDefinition($name, new Definition($class));
     }
 
     /**
@@ -95,15 +89,7 @@ class Container implements ContainerInterface
      */
     public function addDefinition(string $name, DefinitionInterface $definition): DefinitionInterface
     {
-        if (isset($this->definitions[$name])) {
-            throw new DuplicateNameException("Definition with name {$name} already exists.");
-        }
-        $this->definitions[$name] = $definition;
-        if ($this->analyzeReferences) {
-            $this->addReferences($name, $definition->getClass());
-        }
-        $this->addAliases($name, $definition->getAliases());
-        return $definition;
+        return $this->definitionAggregate->addDefinition($name, $definition);
     }
 
     /**
@@ -117,28 +103,9 @@ class Container implements ContainerInterface
     /**
      * {@inheritDoc}
      */
-    protected function addReferences(string $name, string $class): void
-    {
-        $this->addReference($name, $class);
-        $interfaces = class_implements($class);
-        foreach ($interfaces as $interface) {
-            $this->addReference($name, $interface);
-        }
-        $parents = class_parents($class);
-        foreach ($parents as $parent) {
-            $this->addReference($name, $parent);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public function addReference(string $name, string $class): void
     {
-        if (!isset($this->references[$class])) {
-            $this->references[$class] = [];
-        }
-        $this->references[$class][] = $name;
+        $this->definitionAggregate->addReference($name, $class);
     }
 
     /**
@@ -146,9 +113,7 @@ class Container implements ContainerInterface
      */
     public function addAliases(string $name, array $aliases = []): void
     {
-        foreach ($aliases as $alias) {
-            $this->addAlias($name, $alias);
-        }
+        $this->definitionAggregate->addAliases($name, $aliases);
     }
 
     /**
@@ -156,10 +121,7 @@ class Container implements ContainerInterface
      */
     public function addAlias(string $name, string $alias): void
     {
-        if (!isset($this->aliases[$alias])) {
-            $this->aliases[$alias] = [];
-        }
-        $this->aliases[$alias][] = $name;
+        $this->definitionAggregate->addAlias($name, $alias);
     }
 
     /**
@@ -177,18 +139,11 @@ class Container implements ContainerInterface
      * @param string $id
      * @return object
      * @throws CircularException
+     * @throws NotFoundException
      */
     protected function resolveDefinitionById(string $id): object
     {
-        if (!isset($this->definitions[$id])) {
-            if (isset($this->aliases[$id])) {
-                $id = reset($this->aliases[$id]);
-            }
-            if ($this->analyzeReferences && isset($this->references[$id])) {
-                $id = reset($this->references[$id]);
-            }
-        }
-        return $this->resolveDefinition($this->definitions[$id], $id);
+        return $this->resolveDefinition($this->definitionAggregate->get($id), $id);
     }
 
     /**
@@ -244,21 +199,6 @@ class Container implements ContainerInterface
     }
 
     /**
-     * Check that definition exists as definition or alias or reference
-     *
-     * @param string $id
-     * @return bool
-     */
-    protected function hasDefinition(string $id): bool
-    {
-        return (
-            isset($this->definitions[$id]) ||
-            isset($this->aliases[$id]) ||
-            ($this->analyzeReferences && isset($this->references[$id]))
-        );
-    }
-
-    /**
      * Apply all necessary inflections to object
      *
      * @param object $object
@@ -279,16 +219,13 @@ class Container implements ContainerInterface
      */
     public function get($id)
     {
-        if (isset($this->shared[$id])) {
-            return $this->shared[$id];
-        }
-
         if (isset($this->scalars[$id])) {
             return $this->scalars[$id];
         }
 
-        if ($this->hasDefinition($id)) {
-            return $this->resolveDefinitionById($id);
+        if ($this->definitionAggregate->has($id)) {
+            $id = $this->definitionAggregate->resolveDefinitionName($id);
+            return $this->shared[$id] ?? $this->resolveDefinitionById($id);
         }
 
         if ($this->autoWire && class_exists($id)) {
@@ -337,7 +274,7 @@ class Container implements ContainerInterface
             return true;
         }
 
-        if ($this->hasDefinition($id)) {
+        if ($this->definitionAggregate->has($id)) {
             return true;
         }
 
@@ -379,20 +316,6 @@ class Container implements ContainerInterface
     public function setAutoWire(bool $autoWire): self
     {
         $this->autoWire = $autoWire;
-        return $this;
-    }
-
-    /**
-     * Set analyze all added classes with class_parents and class_implements and create references.
-     * When you add Child class to container and try get object by Parent class you will get Child class object
-     * that described in container.
-     *
-     * @param bool $analyzeReferences
-     * @return $this
-     */
-    public function setAnalyzeReferences(bool $analyzeReferences): self
-    {
-        $this->analyzeReferences = $analyzeReferences;
         return $this;
     }
 }

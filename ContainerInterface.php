@@ -3,6 +3,7 @@
 namespace Phact\Container;
 
 use Phact\Container\Definition\DefinitionInterface;
+use Phact\Container\Exceptions\DuplicateNameException;
 use Phact\Container\Inflection\InflectionInterface;
 use Psr\Container\ContainerInterface as PsrContainerInterface;
 
@@ -14,6 +15,7 @@ interface ContainerInterface extends InvokableContainerInterface
      * @param string $name
      * @param string $class
      * @return DefinitionInterface
+     * @throws DuplicateNameException If service with provided name already defined
      */
     public function addDefinitionClass(string $name, string $class): DefinitionInterface;
 
@@ -23,6 +25,7 @@ interface ContainerInterface extends InvokableContainerInterface
      * @param string $name
      * @param DefinitionInterface $definition
      * @return DefinitionInterface
+     * @throws DuplicateNameException If service with provided name already defined
      */
     public function addDefinition(string $name, DefinitionInterface $definition): DefinitionInterface;
 
@@ -43,7 +46,7 @@ interface ContainerInterface extends InvokableContainerInterface
     public function addReference(string $name, string $class): void;
 
     /**
-     * Add aliases of the name
+     * Add aliases of the service name
      *
      * @param string $name
      * @param array $aliases
@@ -51,7 +54,7 @@ interface ContainerInterface extends InvokableContainerInterface
     public function addAliases(string $name, array $aliases = []): void;
 
     /**
-     * Add alias of the name
+     * Add alias of the service name
      *
      * @param string $name
      * @param string $alias
