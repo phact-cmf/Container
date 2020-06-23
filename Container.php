@@ -280,10 +280,6 @@ class Container implements ContainerInterface
      */
     public function has($id): bool
     {
-        if (isset($this->shared[$id])) {
-            return true;
-        }
-
         if (isset($this->scalars[$id])) {
             return true;
         }
