@@ -75,8 +75,8 @@ class Builder implements BuilderInterface
      */
     public function inflect(object $object, InflectionInterface $inflection): object
     {
-        $this->applyCalls($object, $inflection->getCalls());
         $this->applyProperties($object, $inflection->getProperties());
+        $this->applyCalls($object, $inflection->getCalls());
         return $object;
     }
 
@@ -158,6 +158,9 @@ class Builder implements BuilderInterface
         $factory = $definition->getFactory();
 
         if (!is_callable($factory) || is_array($factory)) {
+            if (!$this->container) {
+                throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
+            }
             $factory = $this->buildFactoryFromNonCallable($definition);
         }
 
@@ -175,17 +178,11 @@ class Builder implements BuilderInterface
      *
      * @param DefinitionInterface $definition
      * @return callable
-     * @throws InvalidConfigurationException
      * @throws InvalidFactoryException
      */
     protected function buildFactoryFromNonCallable(DefinitionInterface $definition): callable
     {
-        if (!$this->container) {
-            throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
-        }
         $factory = $definition->getFactory();
-        $factoryId = null;
-        $factoryMethod = null;
         if (is_string($factory)) {
             $factoryId = $this->fetchDependencyId($factory);
             $factoryMethod = $definition->getConstructMethod() ?: '__invoke';
@@ -321,7 +318,7 @@ class Builder implements BuilderInterface
             }
         }
 
-        $arguments = $this->appendUnusedParamsToArguments($parameters, $usedParameters, $arguments);
+        $arguments = $this->appendUnusedParamsToArguments($parameters, $arguments, $usedParameters);
 
         return $arguments;
     }
@@ -333,8 +330,11 @@ class Builder implements BuilderInterface
      * @return array
      * @throws NotFoundException
      */
-    protected function appendUnusedParamsToArguments(array $parameters, array $usedParameters, array $arguments): array
-    {
+    protected function appendUnusedParamsToArguments(
+        array $parameters,
+        array $arguments,
+        array $usedParameters = []
+    ): array {
         foreach ($parameters as $key => $parameter) {
             if (!in_array($key, $usedParameters, true)) {
                 $arguments[] = $this->makeArgumentByParameter($parameter);
@@ -352,18 +352,10 @@ class Builder implements BuilderInterface
     {
         switch ($parameter->getType()) {
             case ParameterInterface::TYPE_REFERENCE_REQUIRED:
-                $resolved = $this->retrieveDependencyFromContainer($parameter->getValue());
-                if ($resolved) {
-                    return $resolved;
-                }
-                throw new NotFoundException("There is no referenced classes of {$parameter->getValue()} found");
+                return $this->retrieveRequiredDependencyFromContainer($parameter->getValue());
 
             case ParameterInterface::TYPE_REFERENCE_OPTIONAL:
-                $resolved = $this->retrieveDependencyFromContainer($parameter->getValue());
-                if ($resolved) {
-                    return $resolved;
-                }
-                return null;
+                return $this->retrieveOptionalDependencyFromContainer($parameter->getValue());
         }
         return $parameter->getValue();
     }
@@ -377,32 +369,35 @@ class Builder implements BuilderInterface
     {
         switch ($dependency->getType()) {
             case DependencyInterface::TYPE_REQUIRED:
-                $resolved = $this->retrieveDependencyFromContainer($dependency->getValue());
-                if ($resolved) {
-                    return $resolved;
-                }
-                throw new NotFoundException("There is no referenced classes of {$dependency->getValue()} found");
+                return $this->retrieveRequiredDependencyFromContainer($dependency->getValue());
 
             case DependencyInterface::TYPE_OPTIONAL:
-                $resolved = $this->retrieveDependencyFromContainer($dependency->getValue());
-                if ($resolved) {
-                    return $resolved;
-                }
-                return null;
+                return $this->retrieveOptionalDependencyFromContainer($dependency->getValue());
         }
         return $dependency->getValue();
     }
 
     /**
-     * Fetch dependency from container
-     *
-     * @param $value
-     * @return mixed|null
+     * @param $id
+     * @return mixed
+     * @throws NotFoundException
      */
-    protected function retrieveDependencyFromContainer($value)
+    protected function retrieveRequiredDependencyFromContainer($id)
     {
-        if ($this->container && $this->container->has($value)) {
-            return $this->container->get($value);
+        if ($this->container && $this->container->has($id)) {
+            return $this->container->get($id);
+        }
+        throw new NotFoundException("There is no referenced classes of {$id} found");
+    }
+
+    /**
+     * @param $id
+     * @return mixed
+     */
+    protected function retrieveOptionalDependencyFromContainer($id)
+    {
+        if ($this->container && $this->container->has($id)) {
+            return $this->container->get($id);
         }
         return null;
     }
