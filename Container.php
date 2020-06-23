@@ -64,16 +64,10 @@ class Container implements ContainerInterface
         ?BuilderInterface $builder = null,
         ?DefinitionAggregateInterface $definitionAggregate = null
     ) {
-        if (!$builder) {
-            $builder = new Builder();
-        }
-        $this->builder = $builder;
+        $this->builder = $builder ?: new Builder();
         $this->builder->setContainer($this);
 
-        if (!$definitionAggregate) {
-            $definitionAggregate = new DefinitionAggregate();
-        }
-        $this->definitionAggregate = $definitionAggregate;
+        $this->definitionAggregate = $definitionAggregate ?: new DefinitionAggregate();
     }
 
     /**
@@ -133,17 +127,13 @@ class Container implements ContainerInterface
         return $inflection;
     }
 
+
     /**
-     * Resolve definition by provided id from definitions, aliases and references
-     *
-     * @param string $id
-     * @return object
-     * @throws CircularException
-     * @throws NotFoundException
+     * @inheritDoc
      */
-    protected function resolveDefinitionById(string $id): object
+    public function addDelegate(PsrContainerInterface $container, bool $applyInflection = true): void
     {
-        return $this->resolveDefinition($this->definitionAggregate->get($id), $id);
+        $this->delegates[] = new Delegate($container, $applyInflection);
     }
 
     /**
@@ -158,7 +148,7 @@ class Container implements ContainerInterface
     {
         $this->setLoading($id);
         $object = $this->builder->construct($definition);
-        if ($id !== null && $definition->isShared()) {
+        if ($definition->isShared()) {
             $this->shared[$id] = $object;
         }
         $object = $this->builder->configure($object, $definition);
@@ -224,13 +214,12 @@ class Container implements ContainerInterface
         }
 
         if ($this->definitionAggregate->has($id)) {
-            $id = $this->definitionAggregate->resolveDefinitionName($id);
-            return $this->shared[$id] ?? $this->resolveDefinitionById($id);
+            return $this->getFromDefinitions($id);
         }
 
-        if ($this->autoWire && class_exists($id)) {
+        if ($this->isAutoWireAvailiableForClass($id)) {
             return $this->resolveDefinition(
-                (new Definition($id))->setShared(true)
+                (new Definition($id))->setShared(false)
             );
         }
 
@@ -242,12 +231,37 @@ class Container implements ContainerInterface
     }
 
     /**
+     * Check that autowire is enabled and class can be loaded
+     *
+     * @param string $class
+     * @return bool
+     */
+    protected function isAutoWireAvailiableForClass(string $class): bool
+    {
+        return $this->autoWire && class_exists($class);
+    }
+
+    /**
+     * Try to find entry in definitions or shared
+     *
+     * @param string $id
+     * @return object
+     * @throws CircularException
+     * @throws NotFoundException
+     */
+    protected function getFromDefinitions(string $id): object
+    {
+        $id = $this->definitionAggregate->resolveDefinitionName($id);
+        return $this->shared[$id] ?? $this->resolveDefinition($this->definitionAggregate->get($id), $id);
+    }
+
+    /**
      * Try to find entry in delegates
      *
      * @param $id
-     * @return mixed|object|null
+     * @return object|null
      */
-    public function getFromDelegates($id)
+    protected function getFromDelegates($id)
     {
         foreach ($this->delegates as $delegate) {
             if ($delegate->getContainer()->has($id)) {
@@ -278,7 +292,7 @@ class Container implements ContainerInterface
             return true;
         }
 
-        if ($this->autoWire && class_exists($id)) {
+        if ($this->isAutoWireAvailiableForClass($id)) {
             return true;
         }
 
@@ -297,14 +311,6 @@ class Container implements ContainerInterface
     public function invoke(callable $callable, array $arguments = [])
     {
         return $this->builder->invoke($callable, $arguments);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function addDelegate(PsrContainerInterface $container, bool $applyInflection = true): void
-    {
-        $this->delegates[] = new Delegate($container, $applyInflection);
     }
 
     /**

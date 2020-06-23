@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Phact\Container\Definition\DefinitionAggregate;
+use Phact\Container\Definition\DefinitionAggregateInterface;
 use Phact\Container\Exceptions\NotFoundException;
 use Psr\Container\ContainerInterface;
 use Tests\Mock\DependsSimpleComponent;
@@ -261,6 +262,42 @@ class ContainerTest extends TestCase
         $container = new Container($builder);
 
         $container->invoke($callable, $arguments);
+    }
+
+    public function testProxyAddReferenceToDefinitionAggregate(): void
+    {
+        $definitionAggregate = $this->createMock(DefinitionAggregateInterface::class);
+        $definitionAggregate
+            ->expects($this->once())
+            ->method('addReference')
+            ->with('SomeName', SimpleComponent::class);
+
+        $container = new Container(null, $definitionAggregate);
+        $container->addReference('SomeName', SimpleComponent::class);
+    }
+
+    public function testProxyAddAliasesToDefinitionAggregate(): void
+    {
+        $definitionAggregate = $this->createMock(DefinitionAggregateInterface::class);
+        $definitionAggregate
+            ->expects($this->once())
+            ->method('addAliases')
+            ->with('SomeName', ['alias1', 'anotherAlias']);
+
+        $container = new Container(null, $definitionAggregate);
+        $container->addAliases('SomeName', ['alias1', 'anotherAlias']);
+    }
+
+    public function testProxyAddAliasToDefinitionAggregate(): void
+    {
+        $definitionAggregate = $this->createMock(DefinitionAggregateInterface::class);
+        $definitionAggregate
+            ->expects($this->once())
+            ->method('addAlias')
+            ->with('SomeName', 'someAlias');
+
+        $container = new Container(null, $definitionAggregate);
+        $container->addAlias('SomeName', 'someAlias');
     }
 
     public function testHasProxyToDelegate(): void
