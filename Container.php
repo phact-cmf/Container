@@ -276,6 +276,22 @@ class Container implements ContainerInterface
     }
 
     /**
+     * Check that entry exists in delegates
+     *
+     * @param $id
+     * @return bool
+     */
+    protected function hasInDelegates($id): bool
+    {
+        foreach ($this->delegates as $delegate) {
+            if ($delegate->getContainer()->has($id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @inheritDoc
      */
     public function has($id): bool
@@ -292,13 +308,7 @@ class Container implements ContainerInterface
             return true;
         }
 
-        foreach ($this->delegates as $delegate) {
-            if ($delegate->getContainer()->has($id)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->hasInDelegates($id);
     }
 
     /**

@@ -2,7 +2,7 @@
 
 namespace Phact\Container\Builder;
 
-class Dependency
+class Dependency implements DependencyInterface
 {
     /**
      * @var int
@@ -30,7 +30,7 @@ class Dependency
     }
 
     /**
-     * @return int
+     * {@inheritDoc}
      */
     public function getType(): int
     {
@@ -38,7 +38,7 @@ class Dependency
     }
 
     /**
-     * @return string
+     * {@inheritDoc}
      */
     public function getName(): string
     {
@@ -46,7 +46,7 @@ class Dependency
     }
 
     /**
-     * @return mixed
+     * {@inheritDoc}
      */
     public function getValue()
     {

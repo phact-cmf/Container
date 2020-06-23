@@ -2,7 +2,6 @@
 
 namespace Phact\Container\Builder;
 
-use Closure;
 use Phact\Container\Definition\DefinitionInterface;
 use Phact\Container\Details\CallInterface;
 use Phact\Container\Details\PropertyInterface;
@@ -11,50 +10,38 @@ use Phact\Container\Exceptions\InvalidFactoryException;
 use Phact\Container\Exceptions\NotFoundException;
 use Phact\Container\Inflection\InflectionInterface;
 use Psr\Container\ContainerInterface;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionFunction;
-use ReflectionFunctionAbstract;
-use ReflectionMethod;
-use ReflectionParameter;
 
 class Builder implements BuilderInterface
 {
-    protected const DEPENDENCY_VALUE = 1;
-    protected const DEPENDENCY_OBJECT_VALUE_REQUIRED = 2;
-    protected const DEPENDENCY_OBJECT_VALUE_OPTIONAL = 3;
-    protected const DEPENDENCY_REFERENCE_REQUIRED = 4;
-    protected const DEPENDENCY_REFERENCE_OPTIONAL = 5;
-
-    /**
-     * Constructors dependencies
-     * @var array
-     */
-    protected $constructors = [];
-
-    /**
-     * Callables dependencies
-     * @var array
-     */
-    protected $callables = [];
-
     /**
      * @var ContainerInterface
      */
     protected $container;
 
+    /**
+     * @var DependenciesResolver
+     */
+    protected $dependenciesResolver;
+
     protected $autoWire = true;
 
-    public function __construct(bool $autoWire = true)
+    public function __construct(bool $autoWire = true, ?DependenciesResolverInterface $dependenciesResolver = null)
     {
         $this->autoWire = $autoWire;
+        $this->dependenciesResolver = $dependenciesResolver ?: new DependenciesResolver();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function setContainer(ContainerInterface $container): void
     {
         $this->container = $container;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function construct(DefinitionInterface $definition): object
     {
         if ($definition->getFactory()) {
@@ -65,6 +52,9 @@ class Builder implements BuilderInterface
         return $object;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function configure(object $object, DefinitionInterface $definition): object
     {
         $this->applyProperties($object, $definition->getProperties());
@@ -72,11 +62,17 @@ class Builder implements BuilderInterface
         return $object;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function invoke(callable $callable, array $arguments = [])
     {
         return $this->call($callable, $arguments);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function inflect(object $object, InflectionInterface $inflection): object
     {
         $this->applyCalls($object, $inflection->getCalls());
@@ -99,7 +95,6 @@ class Builder implements BuilderInterface
      * @param object $object
      * @param CallInterface[] $calls
      * @throws NotFoundException
-     * @throws ReflectionException
      */
     protected function applyCalls(object $object, array $calls): void
     {
@@ -113,26 +108,35 @@ class Builder implements BuilderInterface
      * @param array $arguments
      * @return mixed
      * @throws NotFoundException
-     * @throws ReflectionException
      */
     protected function call(callable $callable, array $arguments = [])
     {
         $dependencies = [];
         if ($this->autoWire) {
-            $dependencies = $this->fetchCallableDependencies($callable);
+            $dependencies = $this->dependenciesResolver->resolveCallableDependencies($callable);
         }
         $parameters = $this->buildParameters($arguments);
         $args = $this->buildArguments($dependencies, $parameters);
         return call_user_func_array($callable, $args);
     }
 
+    /**
+     * Make object without factory
+     *
+     * @param DefinitionInterface $definition
+     * @return mixed
+     * @throws NotFoundException
+     */
     protected function makeObjectSelf(DefinitionInterface $definition)
     {
         $dependencies = [];
 
         $className = $definition->getClass();
         if ($this->autoWire) {
-            $dependencies = $this->fetchConstructorDependencies($className, $definition->getConstructMethod());
+            $dependencies = $this->dependenciesResolver->resolveConstructorDependencies(
+                $className,
+                $definition->getConstructMethod()
+            );
         }
         $parameters = $this->buildParameters($definition->getArguments());
         $arguments = $this->buildArguments($dependencies, $parameters);
@@ -140,6 +144,15 @@ class Builder implements BuilderInterface
         return $this->constructObject($definition->getClass(), $arguments, $definition->getConstructMethod());
     }
 
+    /**
+     * Make object with factory
+     *
+     * @param DefinitionInterface $definition
+     * @return mixed
+     * @throws InvalidConfigurationException
+     * @throws InvalidFactoryException
+     * @throws NotFoundException
+     */
     protected function makeObjectWithFactory(DefinitionInterface $definition)
     {
         $factory = $definition->getFactory();
@@ -150,148 +163,61 @@ class Builder implements BuilderInterface
 
         $dependencies = [];
         if ($this->autoWire) {
-            $dependencies = $this->fetchCallableDependencies($factory);
+            $dependencies = $this->dependenciesResolver->resolveCallableDependencies($factory);
         }
         $parameters = $this->buildParameters($definition->getArguments());
         $arguments = $this->buildArguments($dependencies, $parameters);
         return call_user_func_array($factory, $arguments);
     }
 
+    /**
+     * Build callable factory from non-callable
+     *
+     * @param DefinitionInterface $definition
+     * @return callable
+     * @throws InvalidConfigurationException
+     * @throws InvalidFactoryException
+     */
     protected function buildFactoryFromNonCallable(DefinitionInterface $definition): callable
     {
+        if (!$this->container) {
+            throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
+        }
         $factory = $definition->getFactory();
         $factoryId = null;
         $factoryMethod = null;
         if (is_string($factory)) {
-            $factoryId = $this->fetchDependencyId($factory) ?: $factory;
+            $factoryId = $this->fetchDependencyId($factory);
             $factoryMethod = $definition->getConstructMethod() ?: '__invoke';
-        } elseif (is_array($factory) && \count($factory) === 2) {
-            $factoryId = $this->fetchDependencyId($factory[0]) ?: $factory[0];
+        } elseif (is_array($factory)) {
+            $factoryId = $this->fetchDependencyId($factory[0]);
             $factoryMethod = $factory[1];
+        } else {
+            throw new InvalidFactoryException('Incorrect factory provided, available string and array factories');
         }
-        if (!$this->container) {
-            throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
-        }
-        if ($factoryId && $factoryMethod && $this->container->has($factoryId)) {
+        if ($this->container->has($factoryId)) {
             $factoryResolved = $this->container->get($factoryId);
             return [$factoryResolved, $factoryMethod];
         }
         throw new InvalidFactoryException('Incorrect factory provided');
     }
 
+    /**
+     * Create object with provided arguments and optional construct method
+     *
+     * @param string $className
+     * @param array $arguments
+     * @param string|null $constructMethod
+     * @return mixed
+     */
     protected function constructObject(string $className, array $arguments, ?string $constructMethod = null)
     {
         if ($constructMethod !== null) {
-            if (count($arguments) > 0) {
-                $obj = $className::$constructMethod(...$arguments);
-            } else {
-                $obj = $className::$constructMethod();
-            }
+            $obj = $className::$constructMethod(...$arguments);
         } else {
-            if (count($arguments) > 0) {
-                $obj = new $className(...$arguments);
-            } else {
-                $obj = new $className;
-            }
+            $obj = new $className(...$arguments);
         }
         return $obj;
-    }
-
-    /**
-     * Read callable dependencies
-     *
-     * @param $callable
-     * @return array
-     * @throws ReflectionException
-     */
-    protected function fetchCallableDependencies(callable $callable): array
-    {
-        is_callable($callable, false, $name);
-        if (!isset($this->callables[$name])) {
-            if (is_array($callable)) {
-                $reflection = new ReflectionMethod($callable[0], $callable[1]);
-            } elseif (is_object($callable) && !$callable instanceof Closure) {
-                $reflection = new ReflectionMethod($callable, '__invoke');
-            } else {
-                $reflection = new ReflectionFunction($callable);
-            }
-            $this->callables[$name] = $this->fetchFunctionDependencies($reflection);
-        }
-        return $this->callables[$name];
-    }
-
-    /**
-     * Read constructor dependencies as array
-     *
-     * @param string $className
-     * @param string|null $constructMethod
-     * @return array
-     * @throws ReflectionException
-     */
-    protected function fetchConstructorDependencies(string $className, ?string $constructMethod = null): array
-    {
-        $key = $className . ($constructMethod ? '::' . $constructMethod : '');
-        if (!isset($this->constructors[$key])) {
-            $reflection = new ReflectionClass($className);
-            $dependencies = [];
-            if ($constructMethod === null) {
-                $constructor = $reflection->getConstructor();
-            } else {
-                $constructor = new \ReflectionMethod($className, $constructMethod);
-            }
-            if ($constructor) {
-                $dependencies = $this->fetchFunctionDependencies($constructor);
-            }
-            $this->constructors[$key] = $dependencies;
-        }
-        return $this->constructors[$key];
-    }
-
-
-    /**
-     * Fetch dependencies from function by reflection
-     *
-     * @param ReflectionFunctionAbstract $reflection
-     * @return Dependency[] Dependencies
-     */
-    protected function fetchFunctionDependencies(ReflectionFunctionAbstract $reflection): array
-    {
-        $dependencies = [];
-        foreach ($reflection->getParameters() as $param) {
-            if ($param->isVariadic()) {
-                break;
-            }
-
-            [$type, $value] = $this->getTypeValueByParameter($param);
-
-            $dependencies[] = new Dependency(
-                $type,
-                $param->name,
-                $value
-            );
-        }
-        return $dependencies;
-    }
-
-    /**
-     * @param ReflectionParameter $parameter
-     * @return array
-     */
-    protected function getTypeValueByParameter(ReflectionParameter $parameter): array
-    {
-        $value = null;
-        $type = self::DEPENDENCY_VALUE;
-
-        if ($c = $parameter->getClass()) {
-            $type = self::DEPENDENCY_OBJECT_VALUE_REQUIRED;
-            if ($parameter->allowsNull()) {
-                $type = self::DEPENDENCY_OBJECT_VALUE_OPTIONAL;
-            }
-            $value = $c->name;
-        } elseif ($parameter->isDefaultValueAvailable()) {
-            $value = $parameter->getDefaultValue();
-        }
-        return [$type, $value];
     }
 
     /**
@@ -310,22 +236,22 @@ class Builder implements BuilderInterface
     }
 
     /**
-     * Fetching attribute value
+     * Create parameter from provided argument
      *
      * @param $value
-     * @return Parameter
+     * @return ParameterInterface
      */
-    protected function buildParameter($value): Parameter
+    protected function buildParameter($value): ParameterInterface
     {
-        $type = self::DEPENDENCY_VALUE;
+        $type = ParameterInterface::TYPE_VALUE;
         if (\is_string($value) && 0 === strpos($value, '@')) {
-            $type = self::DEPENDENCY_REFERENCE_REQUIRED;
+            $type = ParameterInterface::TYPE_REFERENCE_REQUIRED;
             if (0 === strpos($value, '@?')) {
                 $value = substr($value, 2);
-                $type = self::DEPENDENCY_REFERENCE_OPTIONAL;
+                $type = ParameterInterface::TYPE_REFERENCE_OPTIONAL;
             } elseif (0 === strpos($value, '@@')) {
                 $value = substr($value, 1);
-                $type = self::DEPENDENCY_VALUE;
+                $type = DependencyInterface::TYPE_VALUE;
             } else {
                 $value = substr($value, 1);
             }
@@ -334,6 +260,8 @@ class Builder implements BuilderInterface
     }
 
     /**
+     * Try fetch dependency name from string value
+     *
      * @param string $value
      * @return string|null
      */
@@ -342,12 +270,14 @@ class Builder implements BuilderInterface
         if (0 === strpos($value, '@')) {
             return substr($value, 1);
         }
-        return null;
+        return $value;
     }
 
     /**
-     * @param Dependency[] $dependencies
-     * @param Parameter[] $parameters
+     * Build arguments by dependencies and parameters
+     *
+     * @param DependencyInterface[] $dependencies
+     * @param ParameterInterface[] $parameters
      * @return array
      * @throws NotFoundException
      */
@@ -358,15 +288,15 @@ class Builder implements BuilderInterface
             $arguments = $this->buildArgumentsFromDependencies($dependencies, $parameters);
         } else {
             foreach ($parameters as $parameter) {
-                $arguments[] = $this->makeArgument($parameter->getType(), $parameter->getValue());
+                $arguments[] = $this->makeArgumentByParameter($parameter);
             }
         }
         return $arguments;
     }
 
     /**
-     * @param Dependency[] $dependencies
-     * @param Parameter[] $parameters
+     * @param DependencyInterface[] $dependencies
+     * @param ParameterInterface[] $parameters
      * @return array
      * @throws NotFoundException
      */
@@ -376,24 +306,19 @@ class Builder implements BuilderInterface
         $usedParameters = [];
 
         foreach ($dependencies as $key => $dependency) {
-            $type = $dependency->getType();
-            $value = $dependency->getValue();
-
+            /** @var ParameterInterface $parameter */
             $parameter = null;
             if (isset($parameters[$key])) {
                 $parameter = $parameters[$key];
                 $usedParameters[] = $key;
+                $arguments[] = $this->makeArgumentByParameter($parameter);
             } elseif (isset($parameters[$dependency->getName()])) {
                 $parameter = $parameters[$dependency->getName()];
                 $usedParameters[] = $dependency->getName();
+                $arguments[] = $this->makeArgumentByParameter($parameter);
+            } else {
+                $arguments[] = $this->makeArgumentByDependency($dependency);
             }
-
-            if ($parameter) {
-                $type = $parameter->getType();
-                $value = $parameter->getValue();
-            }
-
-            $arguments[] = $this->makeArgument($type, $value);
         }
 
         $arguments = $this->appendUnusedParamsToArguments($parameters, $usedParameters, $arguments);
@@ -401,55 +326,82 @@ class Builder implements BuilderInterface
         return $arguments;
     }
 
+    /**
+     * @param array $parameters
+     * @param array $usedParameters
+     * @param array $arguments
+     * @return array
+     * @throws NotFoundException
+     */
     protected function appendUnusedParamsToArguments(array $parameters, array $usedParameters, array $arguments): array
     {
         foreach ($parameters as $key => $parameter) {
             if (!in_array($key, $usedParameters, true)) {
-                $arguments[] = $this->makeArgument(
-                    $parameter->getType(),
-                    $parameter->getValue()
-                );
+                $arguments[] = $this->makeArgumentByParameter($parameter);
             }
         }
         return $arguments;
     }
 
     /**
-     * @param $type
-     * @param $value
+     * @param ParameterInterface $parameter
      * @return mixed
-     * @throws NotFoundException|InvalidConfigurationException
+     * @throws NotFoundException
      */
-    protected function makeArgument(int $type, $value)
+    protected function makeArgumentByParameter(ParameterInterface $parameter)
     {
-        switch ($type) {
-            case self::DEPENDENCY_REFERENCE_REQUIRED:
-            case self::DEPENDENCY_OBJECT_VALUE_REQUIRED:
-                $dependency = $this->retrieveDependencyFromContainer($value);
-                if ($dependency) {
-                    return $dependency;
+        switch ($parameter->getType()) {
+            case ParameterInterface::TYPE_REFERENCE_REQUIRED:
+                $resolved = $this->retrieveDependencyFromContainer($parameter->getValue());
+                if ($resolved) {
+                    return $resolved;
                 }
-                throw new NotFoundException("There is no referenced classes of {$value} found");
+                throw new NotFoundException("There is no referenced classes of {$parameter->getValue()} found");
 
-            case self::DEPENDENCY_OBJECT_VALUE_OPTIONAL:
-            case self::DEPENDENCY_REFERENCE_OPTIONAL:
-                $dependency = $this->retrieveDependencyFromContainer($value);
-                if ($dependency) {
-                    return $dependency;
+            case ParameterInterface::TYPE_REFERENCE_OPTIONAL:
+                $resolved = $this->retrieveDependencyFromContainer($parameter->getValue());
+                if ($resolved) {
+                    return $resolved;
                 }
                 return null;
-
-            default:
-                return $value;
         }
+        return $parameter->getValue();
     }
 
+    /**
+     * @param DependencyInterface $dependency
+     * @return mixed
+     * @throws NotFoundException
+     */
+    protected function makeArgumentByDependency(DependencyInterface $dependency)
+    {
+        switch ($dependency->getType()) {
+            case DependencyInterface::TYPE_REQUIRED:
+                $resolved = $this->retrieveDependencyFromContainer($dependency->getValue());
+                if ($resolved) {
+                    return $resolved;
+                }
+                throw new NotFoundException("There is no referenced classes of {$dependency->getValue()} found");
+
+            case DependencyInterface::TYPE_OPTIONAL:
+                $resolved = $this->retrieveDependencyFromContainer($dependency->getValue());
+                if ($resolved) {
+                    return $resolved;
+                }
+                return null;
+        }
+        return $dependency->getValue();
+    }
+
+    /**
+     * Fetch dependency from container
+     *
+     * @param $value
+     * @return mixed|null
+     */
     protected function retrieveDependencyFromContainer($value)
     {
-        if (!$this->container) {
-            throw new InvalidConfigurationException('Please, provide container for usage dependencies');
-        }
-        if ($this->container->has($value)) {
+        if ($this->container && $this->container->has($value)) {
             return $this->container->get($value);
         }
         return null;

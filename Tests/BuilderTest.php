@@ -302,6 +302,52 @@ class BuilderTest extends TestCase
         $this->assertSame($simpleObject, $object->getSimpleComponent());
     }
 
+    public function testRetrieveOptionalComponentFromContainerWithAutowire(): void
+    {
+        $simpleObject = new SimpleComponent();
+
+        $container = $this->createMock(ContainerInterface::class);
+        $container
+            ->expects($this->once())
+            ->method('has')
+            ->with(SimpleComponent::class)
+            ->willReturn(true);
+
+        $container
+            ->expects($this->once())
+            ->method('get')
+            ->with(SimpleComponent::class)
+            ->willReturn($simpleObject);
+
+        $definition = new Definition(DependsOptionalSimpleComponent::class);
+
+        $builder = new Builder();
+        $builder->setContainer($container);
+        $object = $builder->construct($definition);
+
+        $this->assertInstanceOf(DependsOptionalSimpleComponent::class, $object);
+        $this->assertSame($simpleObject, $object->getSimpleComponent());
+    }
+
+    public function testRetrieveNotExistingOptionalComponentFromContainer(): void
+    {
+        $container = $this->createMock(ContainerInterface::class);
+        $container
+            ->expects($this->once())
+            ->method('has')
+            ->with(SimpleComponent::class)
+            ->willReturn(false);
+
+        $definition = new Definition(DependsOptionalSimpleComponent::class);
+
+        $builder = new Builder();
+        $builder->setContainer($container);
+        $object = $builder->construct($definition);
+
+        $this->assertInstanceOf(DependsOptionalSimpleComponent::class, $object);
+        $this->assertNull($object->getSimpleComponent());
+    }
+
     public function testRetrieveRequiredNullableComponentFromContainer(): void
     {
         $simpleObject = new SimpleComponent();
@@ -329,39 +375,6 @@ class BuilderTest extends TestCase
 
         $this->assertInstanceOf(DependsOptionalSimpleComponent::class, $object);
         $this->assertSame($simpleObject, $object->getSimpleComponent());
-    }
-
-    public function testExceptionOnRetrieveRequiredComponentWithoutContainer(): void
-    {
-        $this->expectException(InvalidConfigurationException::class);
-
-        $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
-            '@simple'
-        ]);
-        $builder = new Builder();
-        $object = $builder->construct($definition);
-    }
-
-    public function testExceptionOnRetrieveOptionalComponentWithoutContainer(): void
-    {
-        $this->expectException(InvalidConfigurationException::class);
-
-        $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
-            '@?simple'
-        ]);
-        $builder = new Builder();
-        $object = $builder->construct($definition);
-    }
-
-    public function testExceptionOnNullableAndRequiredComponentWithoutContainer(): void
-    {
-        $this->expectException(InvalidConfigurationException::class);
-
-        $definition = new Definition(DependsSimpleComponent::class);
-        $builder = new Builder();
-        $object = $builder->construct($definition);
     }
 
     public function testNotFoundNullableAndRequiredComponentInContainerWillThrowsException(): void
@@ -761,6 +774,20 @@ class BuilderTest extends TestCase
 
         $definition = new Definition(DependsSimpleComponent::class);
         $definition->setFactory('incorrect factory');
+
+        $builder = new Builder();
+        $builder->setContainer($container);
+        $object = $builder->construct($definition);
+    }
+
+    public function testExceptionOnIncorrectTypeOfFactory(): void
+    {
+        $this->expectException(InvalidFactoryException::class);
+
+        $container = $this->createMock(ContainerInterface::class);
+
+        $definition = new Definition(DependsSimpleComponent::class);
+        $definition->setFactory(123);
 
         $builder = new Builder();
         $builder->setContainer($container);

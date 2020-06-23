@@ -2,7 +2,7 @@
 
 namespace Phact\Container\Builder;
 
-class Parameter
+class Parameter implements ParameterInterface
 {
     /**
      * @var int
@@ -18,7 +18,7 @@ class Parameter
     }
 
     /**
-     * @return int
+     * {@inheritDoc}
      */
     public function getType(): int
     {
@@ -26,7 +26,7 @@ class Parameter
     }
 
     /**
-     * @return mixed
+     * {@inheritDoc}
      */
     public function getValue()
     {
