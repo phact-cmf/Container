@@ -65,7 +65,7 @@ class Definition implements DefinitionInterface
      * @param array $arguments
      * @return Definition
      */
-    public function addArguments(array $arguments): Definition
+    public function setArguments(array $arguments): Definition
     {
         $this->arguments = $arguments;
         return $this;

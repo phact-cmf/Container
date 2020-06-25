@@ -27,7 +27,7 @@ class DefinitionTest extends TestCase
             'first' => 'firstArgument',
             'second' => 'secondArgument'
         ];
-        $definition->addArguments($args);
+        $definition->setArguments($args);
         $this->assertEquals($args, $definition->getArguments());
     }
 

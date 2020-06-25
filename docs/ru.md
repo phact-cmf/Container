@@ -132,43 +132,145 @@ $container->addInflection($inflection);
 
 ### Добавление дочернего контейнера - addDelegate
 
-@TODO
+Позволяет извлекать сервисы из дочерних контейнеров, если они не найдены в текущем
 
-### Возможность вызова методов с автоматической инъекцией зависимостей - invoke
+```php
+$container->addDelegate($anotherContainer);
+```
 
-@TODO
+### Возможность вызова callable с автоматической инъекцией зависимостей - invoke
+
+Осуществляет вызов callable с инъекцией необходимых зависимостей.
+
+Пример класс:
+
+```php
+class Example {
+    public $simpleComponent;
+
+    public function setSimpleComponent(SimpleComponent $simpleComponent)
+    {
+        $this->simpleComponent = $simpleComponent;
+    }
+}
+```
+
+Вызов:
+
+```
+$example = new Example();
+$container->invoke([$example, 'setSimpleComponent']);
+// $example->simpleComponent instanceof SimpleComponent = true
+```
+
+С передачей аргументов:
+
+```
+$example = new Example();
+$container->invoke([$example, 'setSimpleComponent'], [
+    'simpleComponent' => new SimpleComponent()
+]);
+// $example->simpleComponent instanceof SimpleComponent = true
+```
+
 
 ### Получение объекта - get
 
-@TODO
+Получение объекта по имени, алиасу, классу, родительским классам или интерфейсам.
 
 ### Проверка на возможность получения объекта - has
 
-@TODO
+Проверка на то, присутствует ли объект/описание в контейнере либо в дочерних контейнерах.
 
 ## Объект описания сервиса - Definition
 
-@TODO - конструктор
+Необходим для описания конфигурирования создания объектов.
 
-### Указание аргументов конструктора - addArguments
+### Создание объекта Definition
 
-@TODO - со ссылкой на использование ссылок
+Обязательным параметром конструктора является имя класса, объект которого будет создан.
 
-### Указание вызова метода после создания объекта - addCall
+```
+$definition = new Definition(SimleComponent::class);
+```
 
-@TODO
+### Указание аргументов конструктора - setArguments
+
+Установка аргументов конструктора.
+
+Все не переданные аргументы со значениями по-умолчанию будут заменены на значения по-умолчанию.
+Все не переданные аргументы с указанием определенного класса будут извлечены из контейнера.
+
+```
+$definition->setArguments([
+    'username' => 'admin',
+    'password' => 'mypassword'
+]);
+```
+
+@TODO: Так же, в аргументах конструктора можно (использовать ссылки на описания других сервисов)[#]
+
+```
+$definition->setArguments([
+    'simpleService' => '@simple'
+]);
+```
 
 ### Указание установки свойства после создания объекта - addProperty
 
-@TODO
+Установка свойств будет осуществлена после создания объекта
+
+### Указание вызова метода после создания объекта - addCall
+
+Вызов метода будет осуществлен после создания объекта и установки свойств
+
+```php
+$definition->addCall('setLogin', 'admin');
+```
+
+@TODO: Так же, в аргументах вызова метода можно (использовать ссылки на описания других сервисов)[#]
+
+```php
+$definition->addCall('setSimpleService', '@simple');
+```
 
 ### Добавление псевдонима (тега) - addAliases, addAlias
 
-@TODO
+Впоследствии, по указанным псевдонимам (тегам) можно будет ссылаться на описание сервиса, либо получать объект из контейнера.
+
+Указание псевдонима (тега):
+
+```php
+$definition->addAlias('another_name');
+```
+
+или (сразу несколько):
+
+```php
+$definition->addAliases(['another_name', 'second_name']);
+```
+
+> Важно! Необходимо устанавливать псевдонимы (теги) до передачи описания (Definition) в контейнер.
 
 ### Указание метода-конструктора - setConstructMethod
 
-@TODO
+Можно указать, если для создания объекта необходимо вызвать статический метод класса.
+
+```php
+class Example {
+    public static function create()
+    {
+        return new Example();
+    }
+}
+```
+
+```php
+$definition = new Definition(Example::class);
+$definition->setConstructMethod('create');
+```
+
+Данный метод так же применяется и для работы с фабриками.
 
 ### Указание фабрики для создания объекта - setFactory
 
@@ -176,7 +278,24 @@ $container->addInflection($inflection);
 
 ### Указание, что объект является "общим" (shared) - setShared
 
-@TODO
+> Внимание! По-умолчанию со стандартным описанием (Definition) объект считается "общим" (shared) 
+
+Если необходимо, чтобы объект создался один раз при первом запросе, 
+а впоследствии возвращался один и тот же экземпляр объекта (например, подключение к базе данных),
+то можно указать что объект является "общим":
+
+```
+$definition = new Definition(DatabaseConnection::class);
+$definition->setShared(true);
+```
+
+Если нужно указать, что при каждом запросе объекта должен возвращаться новый экземпляр, 
+то вызываем метод ```setShared``` с параметром ```false```:
+
+```
+$definition = new Definition(Mail::class);
+$definition->setShared(false);
+```
 
 ## Объект конфигурирования объектов определенного вида - Inflection
 

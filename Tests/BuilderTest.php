@@ -78,7 +78,7 @@ class BuilderTest extends TestCase
             ->willReturn($simpleObject);
 
         $definition = new Definition(DependsSimpleComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             'intArgument' => 12,
             'stringArgument' => 'Some string'
         ]);
@@ -109,7 +109,7 @@ class BuilderTest extends TestCase
             ->willReturn($simpleObject);
 
         $definition = new Definition(DependsSimpleComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             'intArgument' => 12
         ]);
         $builder = new Builder();
@@ -124,7 +124,7 @@ class BuilderTest extends TestCase
     public function testCorrectlyCreatesObjectByDefinitionWithArguments(): void
     {
         $definition = new Definition(ComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             'intArgument' => 12
         ]);
         $builder = new Builder();
@@ -138,7 +138,7 @@ class BuilderTest extends TestCase
     public function testCorrectlyCreatesObjectByDefinitionWithArgumentsNotAutoWire(): void
     {
         $definition = new Definition(ComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             12
         ]);
         $builder = new Builder(false);
@@ -152,7 +152,7 @@ class BuilderTest extends TestCase
     public function testCorrectlyCreatesObjectByDefinitionWithVariadicArguments(): void
     {
         $definition = new Definition(ComponentWithVariadicArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             12,
             'another',
             'second'
@@ -223,7 +223,7 @@ class BuilderTest extends TestCase
 
         $definition = new Definition(DependsSimpleConstructionMethodWithArgumentsComponent::class);
         $definition->setConstructMethod('construction');
-        $definition->addArguments([
+        $definition->setArguments([
             'intArgument' => 12
         ]);
         $builder = new Builder();
@@ -240,7 +240,7 @@ class BuilderTest extends TestCase
         $simpleObject = new SimpleComponent();
 
         $definition = new Definition(DependsSimpleComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             'intArgument' => 12,
             'simpleComponent' => $simpleObject,
             'stringArgument' => 'Some string'
@@ -259,7 +259,7 @@ class BuilderTest extends TestCase
         $simpleObject = new SimpleComponent();
 
         $definition = new Definition(DependsSimpleComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             $simpleObject,
             12,
             'Some string'
@@ -291,7 +291,7 @@ class BuilderTest extends TestCase
             ->willReturn($simpleObject);
 
         $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
+        $definition->setArguments([
             '@?simple'
         ]);
         $builder = new Builder();
@@ -366,7 +366,7 @@ class BuilderTest extends TestCase
             ->willReturn($simpleObject);
 
         $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
+        $definition->setArguments([
             '@simple'
         ]);
         $builder = new Builder();
@@ -389,7 +389,7 @@ class BuilderTest extends TestCase
             ->willReturn(false);
 
         $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
+        $definition->setArguments([
             '@simple'
         ]);
         $builder = new Builder();
@@ -423,7 +423,7 @@ class BuilderTest extends TestCase
             ->willReturn(false);
 
         $definition = new Definition(DependsOptionalSimpleComponent::class);
-        $definition->addArguments([
+        $definition->setArguments([
             '@?simple'
         ]);
         $builder = new Builder();
@@ -436,7 +436,7 @@ class BuilderTest extends TestCase
     public function testConvertDoubleAtToSingleAtFromArguments(): void
     {
         $definition = new Definition(ComponentWithArguments::class);
-        $definition->addArguments([
+        $definition->setArguments([
             12,
             '@@mysuperstrongpassword'
         ]);
