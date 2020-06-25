@@ -28,11 +28,13 @@ class Builder implements BuilderInterface
      */
     protected $argumentsBuilder;
 
-    protected $autoWire = true;
+    protected $analyzeArguments = true;
 
-    public function __construct(bool $autoWire = true, ?DependenciesResolverInterface $dependenciesResolver = null)
-    {
-        $this->autoWire = $autoWire;
+    public function __construct(
+        bool $analyzeArguments = true,
+        ?DependenciesResolverInterface $dependenciesResolver = null
+    ) {
+        $this->analyzeArguments = $analyzeArguments;
         $this->dependenciesResolver = $dependenciesResolver ?: new DependenciesResolver();
         $this->argumentsBuilder = new ArgumentsBuilder();
     }
@@ -119,7 +121,7 @@ class Builder implements BuilderInterface
     protected function call(callable $callable, array $arguments = [])
     {
         $dependencies = [];
-        if ($this->autoWire) {
+        if ($this->analyzeArguments) {
             $dependencies = $this->dependenciesResolver->resolveCallableDependencies($callable);
         }
         $parameters = $this->buildParameters($arguments);
@@ -139,7 +141,7 @@ class Builder implements BuilderInterface
         $dependencies = [];
 
         $className = $definition->getClass();
-        if ($this->autoWire) {
+        if ($this->analyzeArguments) {
             $dependencies = $this->dependenciesResolver->resolveConstructorDependencies(
                 $className,
                 $definition->getConstructMethod()
@@ -172,7 +174,7 @@ class Builder implements BuilderInterface
         }
 
         $dependencies = [];
-        if ($this->autoWire) {
+        if ($this->analyzeArguments) {
             $dependencies = $this->dependenciesResolver->resolveCallableDependencies($factory);
         }
         $parameters = $this->buildParameters($definition->getArguments());
