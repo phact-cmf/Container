@@ -173,14 +173,23 @@ $container->invoke([$example, 'setSimpleComponent'], [
 // $example->simpleComponent instanceof SimpleComponent = true
 ```
 
-
 ### Получение объекта - get
 
-Получение объекта по имени, алиасу, классу, родительским классам или интерфейсам.
+Получение объекта по имени, алиасу (псевдониму/тегу), классу, родительским классам или интерфейсам.
+
+```
+$simpleComponent = $container->get(SimpleComponent::class);
+$exampleComponent = $container->get('example');
+```
 
 ### Проверка на возможность получения объекта - has
 
 Проверка на то, присутствует ли объект/описание в контейнере либо в дочерних контейнерах.
+
+```
+$hasSimpleComponent = $container->has(SimpleComponent::class);
+$hasExampleComponent = $container->has('example');
+```
 
 ## Объект описания сервиса - Definition
 
@@ -218,7 +227,12 @@ $definition->setArguments([
 
 ### Указание установки свойства после создания объекта - addProperty
 
-Установка свойств будет осуществлена после создания объекта
+Установка свойств будет осуществлена после создания объекта.
+
+```php
+$definition->addProperty('username', 'admin');
+$definition->addProperty('password', 'mypassword');
+```
 
 ### Указание вызова метода после создания объекта - addCall
 
@@ -236,6 +250,8 @@ $definition->addCall('setSimpleService', '@simple');
 
 ### Добавление псевдонима (тега) - addAliases, addAlias
 
+> Важно! Необходимо устанавливать псевдонимы (теги) до передачи описания (Definition) в контейнер.
+
 Впоследствии, по указанным псевдонимам (тегам) можно будет ссылаться на описание сервиса, либо получать объект из контейнера.
 
 Указание псевдонима (тега):
@@ -249,8 +265,6 @@ $definition->addAlias('another_name');
 ```php
 $definition->addAliases(['another_name', 'second_name']);
 ```
-
-> Важно! Необходимо устанавливать псевдонимы (теги) до передачи описания (Definition) в контейнер.
 
 ### Указание метода-конструктора - setConstructMethod
 
@@ -276,6 +290,35 @@ $definition->setConstructMethod('create');
 
 @TODO
 
+#### Callable
+
+@TODO
+
+#### Invokable - ссылка на описание компонента
+
+@TODO
+
+#### Invokable-объект
+
+@TODO
+
+#### Ссылка на описание и constructorMethod
+
+@TODO
+
+#### Имя класса и constructorMethod
+
+@TODO
+
+#### Массив - ссылка на описание и метод
+
+@TODO
+
+#### Массив - имя класса и метод
+
+@TODO
+
+
 ### Указание, что объект является "общим" (shared) - setShared
 
 > Внимание! По-умолчанию со стандартным описанием (Definition) объект считается "общим" (shared) 
@@ -284,7 +327,7 @@ $definition->setConstructMethod('create');
 а впоследствии возвращался один и тот же экземпляр объекта (например, подключение к базе данных),
 то можно указать что объект является "общим":
 
-```
+```php
 $definition = new Definition(DatabaseConnection::class);
 $definition->setShared(true);
 ```
@@ -292,22 +335,47 @@ $definition->setShared(true);
 Если нужно указать, что при каждом запросе объекта должен возвращаться новый экземпляр, 
 то вызываем метод ```setShared``` с параметром ```false```:
 
-```
+```php
 $definition = new Definition(Mail::class);
 $definition->setShared(false);
 ```
 
 ## Объект конфигурирования объектов определенного вида - Inflection
 
-@TODO
+Контейнер позволяет конфигурировать (вызывать методы и устанавливать свойства) объектам одного типа.
 
-### Указание вызова метода после создания объекта - addCall
+Описанием такой конфигурации является объект Inflection.
 
-@TODO
+Конструктор принимает класс, которому должен соответствовать созданный объект для применения конфигурации:
+
+```php
+$inflection = new Inflection(SimpleInterface::class);
+```
+
+После создания объекта контейнер обойдет все объекты конфигурации и применит подходящие из них.
 
 ### Указание установки свойства после создания объекта - addProperty
 
-@TODO
+Установка свойств буде осуществлена в момент применения объекта конфигурации.
+
+```php
+$inflection->addProperty('username', 'admin');
+$inflection->addProperty('password', 'mypassword');
+```
+
+### Указание вызова метода после создания объекта - addCall
+
+Вызов методов будет осуществлен в момент применения объекта конфигурации после применения свойств.
+
+```php
+$inflection->addCall('setLogin', 'admin');
+```
+
+@TODO: Так же, в аргументах вызова метода можно (использовать ссылки на описания других сервисов)[#]
+
+```php
+$inflection->addCall('setSimpleService', '@simple');
+```
 
 ## Использование ссылок на описания сервисов
 
