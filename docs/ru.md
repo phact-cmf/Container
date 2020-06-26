@@ -21,7 +21,7 @@ $container = new Container();
 ```
 
 С помощью указания собственных реализаций зависимостей контейнера вы можете расширять или изменять его функциональность.
-@TODO: ссылку на [Возможность изменения поведения контейнера](#).
+[Возможность изменения поведения контейнера](#возможность-изменения-поведения-контейнера).
 
 ### Добавление описания сервиса - addDefinition
 
@@ -217,7 +217,7 @@ $definition->setArguments([
 ]);
 ```
 
-@TODO: Так же, в аргументах конструктора можно (использовать ссылки на описания других сервисов)[#]
+Также, в аргументах конструктора можно [использовать ссылки на описания других сервисов](#использование-ссылок-на-описания-сервисов).
 
 ```
 $definition->setArguments([
@@ -242,7 +242,7 @@ $definition->addProperty('password', 'mypassword');
 $definition->addCall('setLogin', 'admin');
 ```
 
-@TODO: Так же, в аргументах вызова метода можно (использовать ссылки на описания других сервисов)[#]
+Также, в аргументах метода можно [использовать ссылки на описания других сервисов](#использование-ссылок-на-описания-сервисов).
 
 ```php
 $definition->addCall('setSimpleService', '@simple');
@@ -288,35 +288,144 @@ $definition->setConstructMethod('create');
 
 ### Указание фабрики для создания объекта - setFactory
 
-@TODO
+Поддерживается указание фабрики для создания объектов.
 
 #### Callable
 
-@TODO
+Пример:
+
+```php
+$definition = new Definition(Example::class);
+$definition->setFactory(function () {
+    return new Example();
+});
+```
 
 #### Invokable - ссылка на описание компонента
 
-@TODO
+Фабрика:
+
+```php
+class ExampleFactory {
+    public function __invoke(){
+        return new Example();
+    }
+}
+```
+
+Контейнер:
+
+```php
+$container->addDefinitionClass('exampleFactory', ExampleFactory::class);
+
+$definition = new Definition(Example::class);
+$definition->setFactory('@exampleFactory');
+```
 
 #### Invokable-объект
 
-@TODO
+Фабрика:
 
-#### Ссылка на описание и constructorMethod
+```php
+class ExampleFactory {
+    public function __invoke(){
+        return new Example();
+    }
+}
+```
 
-@TODO
+Контейнер:
 
-#### Имя класса и constructorMethod
+```php
+$definition = new Definition(Example::class);
+$definition->setFactory(new ExampleFactory());
+```
 
-@TODO
+#### Ссылка на описание и constructMethod
+
+Фабрика:
+
+```php
+class ExampleFactory {
+    public function createExample(){
+        return new Example();
+    }
+}
+```
+
+Контейнер:
+
+```php
+$container->addDefinitionClass('exampleFactory', ExampleFactory::class);
+
+$definition = new Definition(Example::class);
+$definition->setFactory('@exampleFactory');
+$definition->setConstructMethod('createExample');
+```
+
+#### Имя класса и constructMethod
+
+Фабрика:
+
+```php
+class ExampleFactory {
+    public function createExample(){
+        return new Example();
+    }
+}
+```
+
+Контейнер:
+
+```php
+$container->addDefinitionClass('exampleFactory', ExampleFactory::class);
+
+$definition = new Definition(Example::class);
+$definition->setFactory(ExampleFactory::class);
+$definition->setConstructMethod('createExample');
+```
 
 #### Массив - ссылка на описание и метод
 
-@TODO
+Фабрика:
+
+```php
+class ExampleFactory {
+    public function createExample(){
+        return new Example();
+    }
+}
+```
+
+Контейнер:
+
+```php
+$container->addDefinitionClass('exampleFactory', ExampleFactory::class);
+
+$definition = new Definition(Example::class);
+$definition->setFactory(['@exampleFactory', 'createExample']);
+```
 
 #### Массив - имя класса и метод
 
-@TODO
+Фабрика:
+
+```php
+class ExampleFactory {
+    public function createExample(){
+        return new Example();
+    }
+}
+```
+
+Контейнер:
+
+```php
+$container->addDefinitionClass('exampleFactory', ExampleFactory::class);
+
+$definition = new Definition(Example::class);
+$definition->setFactory([ExampleFactory::class, 'createExample']);
+```
 
 
 ### Указание, что объект является "общим" (shared) - setShared
@@ -371,36 +480,208 @@ $inflection->addProperty('password', 'mypassword');
 $inflection->addCall('setLogin', 'admin');
 ```
 
-@TODO: Так же, в аргументах вызова метода можно (использовать ссылки на описания других сервисов)[#]
+Также, в аргументах метода можно [использовать ссылки на описания других сервисов](#использование-ссылок-на-описания-сервисов).
 
 ```php
-$inflection->addCall('setSimpleService', '@simple');
+$inflection->addCall('setSimpleService', ['@simple']);
 ```
 
 ## Использование ссылок на описания сервисов
 
-@TODO: через собаку - где и как, с примерами 
-
 ### В аргументах методов и конструкторов
 
-@TODO
+В аргументах методов и конструкторов можно указывать ссылки на тот или иной сервис.
+Это осуществляется передачей в качестве параметра строки, в которой содержится символ "@" и 
+далее следует имя или псевдоним (тег) сервиса.
 
-### В фабриках
+Например, в контейнере есть описание нескольких сервисов:
+ 
+```php
+$container->addDefinitionClass('fileLogger', Logger::class);
+$container->addDefinitionClass('mailLogger', Logger::class);
+```
 
-@TODO
+Есть класс, который требует объект в качестве зависимости:
+
+```php
+class Example 
+{
+    public function __construct(Logger $logger) 
+    {
+        // ...
+    }
+}
+``` 
+
+В конструктор класса можно передать ссылку на определенный сервис:
+
+```php
+$definition = new Definition(Example::class);
+$definition->setArguments([
+    'logger' => '@fileLogger'
+]);
+```
+
+При создании объекта ```Example``` в качестве логгера будет установлен объект, 
+который создан по описанию (Definition) с именем "fileLogger".
+
+Аналогичным образом работает указание ссылок в аргументах метода (и для Definition и для Inflection):
+
+```php
+$definition->addCall('setLogger', [
+    'logger' => '@fileLogger'
+]);
+```
+
+Если по переданному имени невозможно получить объект, будет выброшено исключение.
+
+Для того чтобы указать опциональную зависимость, необходимо перед именем (псевдонимом/тегом) указать "@?".
+
+Например, имеется метод:
+
+```php
+class Example 
+{
+    public function setLogger(Logger $logger = null) 
+    {
+        // ...
+    }
+}
+```
+
+В описании сервиса укажем:
+
+```php
+$definition->addCall('setLogger', [
+    'logger' => '@?fileLogger'
+]);
+```
+
+В таком случае если компонент по имени (псевдониму/тегу) будет найден - он будет подставлен. 
+Если он не будет найден - будет подставлено значение по-умолчанию.
+
+### Ссылка на сервис в фабриках
+
+Ссылку на сервис можно так же использовать и при указании фабрики для создания объекта.
+
+Например в этом примере для создания объекта будет использоваться 
+метод ```createObject``` сервиса с именем (тегом/псевдонимом) "myFactory":
+
+```php
+$definition->setFactory('@myFactory');
+$definition->setConstructMethod('createObject');
+```
+
+Другой вариант (массив - ссылка на сервис и его метод):
+
+```php
+$definition->setFactory(['@myFactory', 'createObject']);
+```
+
+Или (если "myFactory" является Invokable объектом):
+
+```php
+$definition->setFactory('@myFactory');
+```
 
 ## Управление анализом предков и интерфейсов добавляемых классов
 
-@TODO
+По-умолчанию Container (а точнее его часть - DefinitionAggregate) автоматически анализирует 
+все родительские классы и интерфейсы добавляемого сервиса.
+
+Если у контейнера будет запрошен объект по интерфейсу или родительскому классу, 
+то вернется соответствующий объект.
+
+Например, есть класс:
+
+```php
+class Example extends ExampleParent implements ExampleInterface 
+{
+    // ...
+}
+```
+
+Добавим его в контейнер:
+
+```php
+$definition = new Definition(Example::class);
+$container->addDefinition('example', $definition);
+```
+
+Теперь, при попытке получить объект по классам ```ExampleParent::class``` и ```ExampleInterface::class```
+будет получен объект созданный по описанию, добавленному нами выше:
+
+```php
+$object = $container->get(ExampleParent::class);
+// get_class($object) = Example::class
+
+$object = $container->get(ExampleInterface::class);
+// get_class($object) = Example::class
+```
+
+Отключить данное поведение можно следующим образом:
+
+```php
+$definitionAggregate = new DefinitionAggregate();
+$definitionAggregate->setAnalyzeReferences(false);
+
+$container = new Container(null, $definitionAggregate);
+```
 
 ## Управление созданием объектов, не описанных через объект Definition
 
-@TODO
+По-умолчанию контейнер будет пытаться автоматически создать необходимые объекты, даже если они не были описаны в контейнере.
+
+Например, имеем класс:
+
+```php
+class Example 
+{
+    public function setLogger(Logger $logger = null) 
+    {
+        // ...
+    }
+}
+```
+
+Добавим его описание в контейнер:
+
+```php
+$definition = new Definition(Example::class);
+$container->addDefinition('example', $definition);
+```
+
+При попытке получить объект ```Example::class``` контейнер попытается найти описание подходящего класса, 
+необходимого для создания объекта (в нашем случае это ```Logger::class```).
+
+Если найти подходящее описание невозможно, контейнер попытается создать этого класса.
+
+Отключить это поведение можно следующим образом:
+
+```php
+$container = new Container();
+$container->setAutoWire(false);
+```
 
 ## Управление анализом аргументов методов и конструкторов
 
-@TODO
+По-умолчанию Container (а точнее его часть - Builder) анализирует все аргументы методов и конструкторов, 
+что позволяет автоматически подставлять необходимые зависимости.
+
+Отключить это поведение можно следующим образом:
+
+```php
+$builder = new Builder(false);
+$container = new Container($builder);
+```
 
 ## Возможность изменения поведения контейнера
 
-@TODO 
+Структура контейнера:
+
+- Container
+    - BuilderInterface
+        - DependenciesResolverInterface
+    - DefinitionAggregateInterface
+
+Все зависимости являются заменяемыми и расширяемыми.
