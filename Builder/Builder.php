@@ -166,7 +166,7 @@ class Builder implements BuilderInterface
     {
         $factory = $definition->getFactory();
 
-        if (!is_callable($factory) || is_array($factory)) {
+        if (!is_callable($factory) || (is_array($factory))) {
             if (!$this->container) {
                 throw new InvalidConfigurationException('Please, provide container for usage non-callable factories');
             }
@@ -193,17 +193,59 @@ class Builder implements BuilderInterface
     {
         $factory = $definition->getFactory();
         if (is_string($factory)) {
-            $factoryId = $this->fetchDependencyId($factory);
-            $factoryMethod = $definition->getConstructMethod() ?: '__invoke';
-        } elseif (is_array($factory)) {
-            $factoryId = $this->fetchDependencyId($factory[0]);
-            $factoryMethod = $factory[1];
-        } else {
-            throw new InvalidFactoryException('Incorrect factory provided, available string and array factories');
+            return $this->resolveStringFactory($definition, $factory);
         }
-        if ($this->container->has($factoryId)) {
-            $factoryResolved = $this->container->get($factoryId);
-            return [$factoryResolved, $factoryMethod];
+        if (is_array($factory)) {
+            return $this->resolveArrayFactory($definition, $factory);
+        }
+        throw new InvalidFactoryException('Incorrect factory provided, available string and array factories');
+    }
+
+    /**
+     * @param DefinitionInterface $definition
+     * @param string $factory
+     * @return callable
+     * @throws InvalidFactoryException
+     */
+    protected function resolveStringFactory(DefinitionInterface $definition, string $factory): callable
+    {
+        $id = $this->fetchDependencyId($factory);
+        $method = $definition->getConstructMethod() ?: '__invoke';
+        return $this->resolveFactoryFromContainer($id, $method);
+    }
+
+    /**
+     * @param DefinitionInterface $definition
+     * @param array $factory
+     * @return callable
+     * @throws InvalidFactoryException
+     */
+    protected function resolveArrayFactory(DefinitionInterface $definition, array $factory): callable
+    {
+        if (!isset($factory[0], $factory[1])) {
+            throw new InvalidFactoryException('Array factory must contain 2 elements');
+        }
+        list($id, $method) = $factory;
+        if (is_object($id)) {
+            return $factory;
+        }
+        $id = $this->fetchDependencyId($id);
+        return $this->resolveFactoryFromContainer($id, $method);
+    }
+
+    /**
+     * Fetch factory from container
+     *
+     * @param $id
+     * @param $method
+     * @return callable
+     * @throws InvalidFactoryException
+     */
+    protected function resolveFactoryFromContainer($id, $method): callable
+    {
+        if ($this->container->has($id)) {
+            $factoryResolved = $this->container->get($id);
+            return [$factoryResolved, $method];
         }
         throw new InvalidFactoryException('Incorrect factory provided');
     }
